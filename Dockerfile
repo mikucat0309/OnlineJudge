@@ -1,18 +1,18 @@
-FROM python:3.8-alpine3.14
+FROM python:3.11-alpine
 
 ENV OJ_ENV production
-
-ADD . /app
 WORKDIR /app
 
+COPY ./deploy/ /app/deploy/
+RUN <<EOS
+set -ex
+apk add --no-cache build-base supervisor jpeg-dev zlib-dev postgresql-dev freetype-dev
+pip install --no-cache-dir -r /app/deploy/requirements.txt
+apk del build-base --purge
+EOS
+COPY ./ ./
+RUN chmod -R u=rwX,go=rX ./ && chmod +x ./deploy/entrypoint.sh
+
 HEALTHCHECK --interval=5s --retries=3 CMD python3 /app/deploy/health_check.py
-
-RUN apk add --update --no-cache build-base nginx openssl curl unzip supervisor jpeg-dev zlib-dev postgresql-dev freetype-dev && \
-    pip install --no-cache-dir -r /app/deploy/requirements.txt && \
-    apk del build-base --purge
-
-RUN curl -L  $(curl -s  https://api.github.com/repos/QingdaoU/OnlineJudgeFE/releases/latest | grep /dist.zip | cut -d '"' -f 4) -o dist.zip && \
-    unzip dist.zip && \
-    rm dist.zip
-
+EXPOSE 8080
 ENTRYPOINT /app/deploy/entrypoint.sh
